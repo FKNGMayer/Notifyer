@@ -48,6 +48,7 @@ export const api = {
   setAutostart: (enabled: boolean) => invoke<Settings>("set_autostart", { enabled }),
   openSettings: () => invoke<void>("open_settings"),
   hideSettings: () => invoke<void>("hide_settings"),
+  settingsResize: (height: number) => invoke<void>("settings_resize", { height }),
 
   saveEntry: (text: string, due: number | null, offsets: number[]) =>
     invoke<void>("save_entry", { text, due, offsets }),

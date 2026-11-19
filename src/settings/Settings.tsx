@@ -16,6 +16,7 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
   const [openCount, setOpenCount] = useState(0);
   const errorTimer = useRef<number | undefined>(undefined);
+  const shellRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => api.getSettings().then(setSettings), []);
 
@@ -54,6 +55,15 @@ export default function Settings() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Keep the native window exactly as tall as the content (it changes with warnings).
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => api.settingsResize(Math.ceil(el.offsetHeight)));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [settings === null]);
+
   if (!settings) return <div className="shell" />;
 
   const pickVault = async () => {
@@ -73,7 +83,7 @@ export default function Settings() {
   const offsetChoices = [...new Set([...OFFSET_PRESETS, ...settings.defaultOffsets])].sort((a, b) => b - a);
 
   return (
-    <div className="shell">
+    <div ref={shellRef} className="shell">
       <div key={openCount} className="panel settings pop">
         <header className="s-titlebar" data-tauri-drag-region>
           <span className="s-title" data-tauri-drag-region>

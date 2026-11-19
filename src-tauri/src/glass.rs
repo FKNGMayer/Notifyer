@@ -145,12 +145,13 @@ fn prepare_window(window: &WebviewWindow) -> Result<(HWND, f32)> {
             &BOOL(1) as *const _ as _,
             size_of::<BOOL>() as u32,
         )?;
-        DwmSetWindowAttribute(
+        // Windows 11 only; older systems have square frameless windows anyway.
+        let _ = DwmSetWindowAttribute(
             hwnd,
             DWMWA_WINDOW_CORNER_PREFERENCE,
             &DWMWCP_DONOTROUND as *const _ as _,
             size_of_val(&DWMWCP_DONOTROUND) as u32,
-        )?;
+        );
     }
     Ok((hwnd, window.scale_factor().unwrap_or(1.0) as f32))
 }

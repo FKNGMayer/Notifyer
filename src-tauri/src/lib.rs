@@ -21,6 +21,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 const SHADOW_INSET: f64 = 28.0;
 const QUICK_WIDTH: f64 = 640.0 + 2.0 * SHADOW_INSET;
 const POPUP_WIDTH: f64 = 640.0;
+const SETTINGS_WIDTH: f64 = 560.0 + 2.0 * SHADOW_INSET;
 const PANEL_RADIUS: f64 = 20.0;
 
 struct AppState {
@@ -230,6 +231,12 @@ fn show_settings(app: &AppHandle) {
 #[tauri::command]
 fn open_settings(app: AppHandle) {
     show_settings(&app);
+}
+
+/// Keeps the settings window exactly as tall as its content.
+#[tauri::command]
+fn settings_resize(app: AppHandle, height: f64) {
+    let _ = window(&app, "settings").set_size(LogicalSize::new(SETTINGS_WIDTH, height));
 }
 
 #[tauri::command]
@@ -504,6 +511,7 @@ pub fn run() {
             set_autostart,
             open_settings,
             hide_settings,
+            settings_resize,
             save_entry,
             list_reminders,
             delete_reminder,
