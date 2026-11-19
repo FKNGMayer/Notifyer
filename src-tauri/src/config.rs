@@ -11,6 +11,8 @@ pub struct Config {
     pub inbox_folder: String,
     /// Minutes before the event when a heads-up popup is shown.
     pub default_offsets: Vec<u32>,
+    pub popup_seconds: u32,
+    pub autostart: bool,
 }
 
 impl Default for Config {
@@ -20,6 +22,8 @@ impl Default for Config {
             vault_path: None,
             inbox_folder: "Входящие".into(),
             default_offsets: vec![60, 30, 5],
+            popup_seconds: 15,
+            autostart: true,
         }
     }
 }
@@ -34,11 +38,15 @@ pub fn load_or_create(path: &Path) -> Config {
         });
     }
     let config = Config::default();
-    if let Some(dir) = path.parent() {
-        let _ = fs::create_dir_all(dir);
-    }
-    let _ = fs::write(path, serde_json::to_string_pretty(&config).unwrap());
+    let _ = save(path, &config);
     config
+}
+
+pub fn save(path: &Path, config: &Config) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(path, serde_json::to_string_pretty(config).unwrap())
 }
 
 #[derive(Deserialize)]
@@ -66,4 +74,13 @@ pub fn detect_vault() -> Option<PathBuf> {
         .filter(|v| v.path.is_dir())
         .max_by_key(|v| (v.open, v.ts))
         .map(|v| v.path)
+}
+
+/// The configured vault if it still exists, otherwise the detected one.
+pub fn resolve_vault(config: &Config) -> Option<PathBuf> {
+    config.vault_path.clone().filter(|p| p.is_dir()).or_else(detect_vault)
+}
+
+pub fn looks_like_vault(path: &Path) -> bool {
+    path.join(".obsidian").is_dir()
 }

@@ -1,23 +1,41 @@
 :root {
-  --text: #f4f3f8;
-  --text-dim: rgba(244, 243, 248, 0.56);
-  --text-faint: rgba(244, 243, 248, 0.34);
-  --line: rgba(255, 255, 255, 0.08);
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-hover: rgba(255, 255, 255, 0.09);
-  --accent: #a78bfa;
-  --accent-strong: #8b5cf6;
-  --accent-soft: rgba(167, 139, 250, 0.16);
-  --danger: #fb7185;
+  /* Apple-style dark palette on top of real backdrop blur. */
+  --label: rgba(255, 255, 255, 0.94);
+  --label-2: rgba(235, 235, 245, 0.62);
+  --label-3: rgba(235, 235, 245, 0.34);
+  --fill: rgba(120, 120, 128, 0.32);
+  --fill-2: rgba(120, 120, 128, 0.22);
+  --fill-3: rgba(120, 120, 128, 0.14);
+  --separator: rgba(255, 255, 255, 0.08);
+  --accent: #8a87ff;
+  --accent-fill: rgba(122, 119, 255, 0.26);
+  --accent-label: #d4d3ff;
+  --orange: #ff9f0a;
+  --green: #30d158;
+  --red: #ff453a;
+
+  /* Glass tint and edges, shared by every panel. */
+  --glass-tint: rgba(22, 22, 28, 0.58);
+  --glass-edge: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --glass-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.55), 0 18px 48px -14px rgba(0, 0, 0, 0.6),
+    0 6px 14px -6px rgba(0, 0, 0, 0.35);
+  --panel-radius: 20px;
+
+  /* Keep in sync with glass.rs (DURATION, EASE, POP_DURATION). */
+  --glass-duration: 380ms;
+  --glass-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --pop-duration: 220ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-family: "Inter Variable", "Segoe UI Variable Text", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.4;
-  color: var(--text);
+  letter-spacing: -0.006em;
+  color: var(--label);
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
   font-synthesis: none;
+  font-feature-settings: "cv11", "ss03";
 }
 
 * {
@@ -27,21 +45,127 @@
 html,
 body {
   margin: 0;
-  height: auto;
   overflow: hidden;
+  background: transparent;
   user-select: none;
   cursor: default;
-}
-
-html {
-  /* Dark tint over the acrylic window effect (Windows 11 ignores the native tint colour). */
-  background: rgba(10, 10, 16, 0.62);
 }
 
 button {
   font: inherit;
   color: inherit;
+  letter-spacing: inherit;
   border: 0;
+  padding: 0;
   background: none;
-  cursor: pointer;
+  cursor: default;
+}
+
+input {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+/* Transparent margin around a glass panel; it is where the shadow is painted. */
+.shell {
+  padding: 28px;
+}
+
+.panel {
+  position: relative;
+  border-radius: var(--panel-radius);
+  overflow: hidden;
+  background: var(--glass-tint);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Edge highlight sits above the content so it is never covered. */
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--glass-edge);
+  pointer-events: none;
+}
+
+.pop {
+  animation: pop-in var(--pop-duration) var(--glass-ease);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--fill-2);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--label-3);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.icon-button:hover {
+  background: var(--fill-3);
+  color: var(--label);
+}
+
+.icon-button:active {
+  background: var(--fill-2);
+}
+
+/* Toggleable capsule (offsets). */
+.token {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: var(--fill-3);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label-2);
+  transition: background-color 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+
+.token:hover {
+  background: var(--fill-2);
+  color: var(--label);
+}
+
+.token:active {
+  transform: scale(0.95);
+}
+
+.token[aria-pressed="true"] {
+  background: var(--accent-fill);
+  color: var(--accent-label);
+  box-shadow: inset 0 0 0 0.5px rgba(160, 158, 255, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }

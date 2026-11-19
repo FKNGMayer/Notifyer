@@ -1,30 +1,36 @@
 mod config;
+#[cfg(windows)]
+mod glass;
 mod reminders;
 mod vault;
 
 use chrono::{Local, TimeZone};
 use config::Config;
 use reminders::{Popup, Reminder, Store};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow, WindowEvent};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-use tauri_plugin_opener::OpenerExt;
 
-const QUICK_WIDTH: f64 = 640.0;
-const POPUP_WIDTH: f64 = 380.0;
-const POPUP_MARGIN: i32 = 16;
+/// Transparent margin around glass panels, leaves room for the CSS shadow.
+const SHADOW_INSET: f64 = 28.0;
+const QUICK_WIDTH: f64 = 640.0 + 2.0 * SHADOW_INSET;
+const POPUP_WIDTH: f64 = 640.0;
+const PANEL_RADIUS: f64 = 20.0;
 
 struct AppState {
-    config: Config,
     config_path: PathBuf,
-    vault: Option<PathBuf>,
+    config: Mutex<Config>,
+    vault: Mutex<Option<PathBuf>>,
     store: Mutex<Store>,
     pending: Mutex<Vec<Popup>>,
+    /// Island rectangles of the popup window, used for click-through hit testing.
+    popup_rects: Mutex<Vec<GlassRect>>,
 }
 
 fn now_ms() -> i64 {
@@ -35,17 +41,32 @@ fn window(app: &AppHandle, label: &str) -> WebviewWindow {
     app.get_webview_window(label).expect("window is declared in tauri.conf.json")
 }
 
+fn on_main(app: &AppHandle, f: impl FnOnce() + Send + 'static) {
+    let _ = app.run_on_main_thread(f);
+}
+
+/// Activates the window and hands keyboard focus to its webview. Activation alone is not
+/// enough when another process owned the foreground (e.g. a second launch with `--new`).
+fn focus(w: &WebviewWindow) {
+    let _ = w.set_focus();
+    let _ = AsRef::<tauri::Webview>::as_ref(w).set_focus();
+}
+
+// ---------- quick window ----------
+
 fn show_quick(app: &AppHandle) {
     let w = window(app, "quick");
     if let Ok(Some(monitor)) = w.current_monitor().or_else(|_| w.primary_monitor()) {
         let area = monitor.work_area();
         let width = (QUICK_WIDTH * monitor.scale_factor()) as i32;
         let x = area.position.x + (area.size.width as i32 - width) / 2;
-        let y = area.position.y + (area.size.height as f64 * 0.26) as i32;
+        let y = area.position.y + (area.size.height as f64 * 0.24) as i32;
         let _ = w.set_position(PhysicalPosition::new(x, y));
     }
+    #[cfg(windows)]
+    on_main(app, || glass::pop_in("quick"));
     let _ = w.show();
-    let _ = w.set_focus();
+    focus(&w);
     let _ = w.emit_to("quick", "quick-shown", ());
 }
 
@@ -58,26 +79,165 @@ fn toggle_quick(app: &AppHandle) {
     }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Settings {
-    default_offsets: Vec<u32>,
-    vault_name: Option<String>,
-    inbox_folder: String,
+#[tauri::command]
+fn hide_quick(app: AppHandle) {
+    let _ = window(&app, "quick").hide();
 }
 
 #[tauri::command]
-fn get_settings(state: tauri::State<AppState>) -> Settings {
-    Settings {
-        default_offsets: state.config.default_offsets.clone(),
-        vault_name: state
-            .vault
+fn quick_resize(app: AppHandle, height: f64) {
+    let _ = window(&app, "quick").set_size(LogicalSize::new(QUICK_WIDTH, height));
+}
+
+// ---------- settings ----------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SettingsView {
+    hotkey: String,
+    vault_path: Option<String>,
+    vault_name: Option<String>,
+    vault_auto: bool,
+    vault_valid: bool,
+    inbox_folder: String,
+    default_offsets: Vec<u32>,
+    popup_seconds: u32,
+    autostart: bool,
+}
+
+fn settings_view(state: &AppState) -> SettingsView {
+    let config = state.config.lock().unwrap();
+    let vault = state.vault.lock().unwrap();
+    SettingsView {
+        hotkey: config.hotkey.clone(),
+        vault_path: vault.as_ref().map(|p| p.to_string_lossy().into_owned()),
+        vault_name: vault
             .as_ref()
             .and_then(|p| p.file_name())
             .map(|n| n.to_string_lossy().into_owned()),
-        inbox_folder: state.config.inbox_folder.clone(),
+        vault_auto: config.vault_path.is_none(),
+        vault_valid: vault.as_deref().is_some_and(config::looks_like_vault),
+        inbox_folder: config.inbox_folder.clone(),
+        default_offsets: config.default_offsets.clone(),
+        popup_seconds: config.popup_seconds,
+        autostart: config.autostart,
     }
 }
+
+/// Applies a change, persists it and tells every window.
+fn update_config(app: &AppHandle, change: impl FnOnce(&mut Config)) -> Result<SettingsView, String> {
+    let state = app.state::<AppState>();
+    {
+        let mut config = state.config.lock().unwrap();
+        change(&mut config);
+        config::save(&state.config_path, &config).map_err(|e| format!("Не удалось сохранить: {e}"))?;
+        *state.vault.lock().unwrap() = config::resolve_vault(&config);
+    }
+    let _ = app.emit("settings-changed", ());
+    Ok(settings_view(&state))
+}
+
+#[tauri::command]
+fn get_settings(state: tauri::State<AppState>) -> SettingsView {
+    settings_view(&state)
+}
+
+#[tauri::command]
+fn set_hotkey(app: AppHandle, hotkey: String) -> Result<SettingsView, String> {
+    let shortcuts = app.global_shortcut();
+    let old = app.state::<AppState>().config.lock().unwrap().hotkey.clone();
+    let _ = shortcuts.unregister_all();
+    if let Err(e) = shortcuts.register(hotkey.as_str()) {
+        let _ = shortcuts.register(old.as_str());
+        return Err(format!("Сочетание {hotkey} занято или недопустимо ({e})"));
+    }
+    update_config(&app, |c| c.hotkey = hotkey)
+}
+
+/// Releases the global hotkey while the settings window records a new one.
+#[tauri::command]
+fn hotkey_recording(app: AppHandle, active: bool) {
+    let shortcuts = app.global_shortcut();
+    let _ = shortcuts.unregister_all();
+    if !active {
+        let hotkey = app.state::<AppState>().config.lock().unwrap().hotkey.clone();
+        let _ = shortcuts.register(hotkey.as_str());
+    }
+}
+
+#[tauri::command]
+fn set_vault(app: AppHandle, path: Option<String>) -> Result<SettingsView, String> {
+    let path = path.map(PathBuf::from);
+    if path.as_ref().is_some_and(|p| !p.is_dir()) {
+        return Err("Папка не найдена".into());
+    }
+    update_config(&app, |c| c.vault_path = path)
+}
+
+#[tauri::command]
+fn set_inbox_folder(app: AppHandle, folder: String) -> Result<SettingsView, String> {
+    let folder = folder.trim().trim_matches(['/', '\\']).to_string();
+    if folder.is_empty() || folder.contains("..") {
+        return Err("Некорректное имя папки".into());
+    }
+    update_config(&app, |c| c.inbox_folder = folder)
+}
+
+#[tauri::command]
+fn set_default_offsets(app: AppHandle, mut offsets: Vec<u32>) -> Result<SettingsView, String> {
+    offsets.retain(|m| *m > 0);
+    offsets.sort_unstable_by(|a, b| b.cmp(a));
+    offsets.dedup();
+    update_config(&app, |c| c.default_offsets = offsets)
+}
+
+#[tauri::command]
+fn set_popup_seconds(app: AppHandle, seconds: u32) -> Result<SettingsView, String> {
+    update_config(&app, |c| c.popup_seconds = seconds.clamp(3, 600))
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, enabled: bool) -> Result<SettingsView, String> {
+    apply_autostart(&app, enabled)?;
+    update_config(&app, |c| c.autostart = enabled)
+}
+
+fn apply_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    // Dev builds would register the debug binary; only the installed app touches the registry.
+    if cfg!(debug_assertions) {
+        return Ok(());
+    }
+    let autostart = app.autolaunch();
+    if autostart.is_enabled().unwrap_or(false) == enabled {
+        return Ok(());
+    }
+    let result = if enabled { autostart.enable() } else { autostart.disable() };
+    result.map_err(|e| format!("Не удалось изменить автозапуск: {e}"))
+}
+
+fn show_settings(app: &AppHandle) {
+    let _ = window(app, "quick").hide();
+    let w = window(app, "settings");
+    let _ = w.center();
+    let _ = w.show();
+    let _ = w.unminimize();
+    focus(&w);
+    let _ = w.emit_to("settings", "settings-shown", ());
+    #[cfg(windows)]
+    on_main(app, || glass::pop_in("settings"));
+}
+
+#[tauri::command]
+fn open_settings(app: AppHandle) {
+    show_settings(&app);
+}
+
+#[tauri::command]
+fn hide_settings(app: AppHandle) {
+    let _ = window(&app, "settings").hide();
+}
+
+// ---------- notes & reminders ----------
 
 #[tauri::command]
 fn save_entry(
@@ -92,10 +252,13 @@ fn save_entry(
     }
     let vault = state
         .vault
-        .as_ref()
-        .ok_or("Хранилище Obsidian не найдено — укажите vaultPath в конфиге")?;
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("Хранилище Obsidian не найдено — выберите его в настройках")?;
+    let folder = state.config.lock().unwrap().inbox_folder.clone();
     let due_local = due.and_then(|ms| Local.timestamp_millis_opt(ms).single());
-    vault::append_entry(vault, &state.config.inbox_folder, Local::now(), &text, due_local)
+    vault::append_entry(&vault, &folder, Local::now(), &text, due_local)
         .map_err(|e| format!("Не удалось записать в хранилище: {e}"))?;
     if let Some(due) = due {
         state.store.lock().unwrap().add(text, due, offsets, now_ms());
@@ -120,22 +283,14 @@ fn snooze(app: AppHandle, state: tauri::State<AppState>, text: String, minutes: 
     let _ = app.emit_to("quick", "reminders-changed", ());
 }
 
-#[tauri::command]
-fn hide_quick(app: AppHandle) {
-    let _ = window(&app, "quick").hide();
-}
-
-#[tauri::command]
-fn quick_resize(app: AppHandle, height: f64) {
-    let _ = window(&app, "quick").set_size(LogicalSize::new(QUICK_WIDTH, height));
-}
+// ---------- popup ----------
 
 #[tauri::command]
 fn popup_take_pending(state: tauri::State<AppState>) -> Vec<Popup> {
     std::mem::take(&mut *state.pending.lock().unwrap())
 }
 
-/// Sizes the popup to its cards and pins it to the top-right corner; height 0 hides it.
+/// Sizes the popup to its islands and pins it to the top centre; height 0 hides it.
 #[tauri::command]
 fn popup_layout(app: AppHandle, height: f64) {
     let w = window(&app, "popup");
@@ -147,21 +302,67 @@ fn popup_layout(app: AppHandle, height: f64) {
     if let Ok(Some(monitor)) = w.primary_monitor() {
         let area = monitor.work_area();
         let width = (POPUP_WIDTH * monitor.scale_factor()) as i32;
-        let margin = (POPUP_MARGIN as f64 * monitor.scale_factor()) as i32;
-        let x = area.position.x + area.size.width as i32 - width - margin;
-        let _ = w.set_position(PhysicalPosition::new(x, area.position.y + margin));
+        let x = area.position.x + (area.size.width as i32 - width) / 2;
+        let _ = w.set_position(PhysicalPosition::new(x, area.position.y));
     }
-    let _ = w.show();
+    if !w.is_visible().unwrap_or(false) {
+        let _ = w.set_ignore_cursor_events(true);
+        let _ = w.show();
+    }
 }
 
-fn open_config_file(app: &AppHandle) {
-    let path = app.state::<AppState>().config_path.to_string_lossy().into_owned();
-    let _ = app.opener().open_path(path, None::<&str>);
+/// A glass pane in CSS pixels relative to the window's client area.
+#[derive(Deserialize, Clone, Debug)]
+pub struct GlassRect {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    pub radius: f64,
 }
 
 #[tauri::command]
-fn open_config(app: AppHandle) {
-    open_config_file(&app);
+fn glass_layout(app: AppHandle, window: WebviewWindow, rects: Vec<GlassRect>) {
+    let label = window.label().to_string();
+    if label == "popup" {
+        *app.state::<AppState>().popup_rects.lock().unwrap() = rects.clone();
+    }
+    #[cfg(windows)]
+    on_main(&app, move || glass::layout(&label, &rects));
+}
+
+/// The popup window is wide and transparent; only its islands should catch the mouse.
+fn spawn_popup_hit_testing(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut passthrough = true;
+        loop {
+            let popup = window(&app, "popup");
+            if !popup.is_visible().unwrap_or(false) {
+                passthrough = true;
+                std::thread::sleep(Duration::from_millis(250));
+                continue;
+            }
+            if let (Ok(cursor), Ok(origin), Ok(scale)) =
+                (popup.cursor_position(), popup.inner_position(), popup.scale_factor())
+            {
+                let x = (cursor.x - origin.x as f64) / scale;
+                let y = (cursor.y - origin.y as f64) / scale;
+                let over_island = app
+                    .state::<AppState>()
+                    .popup_rects
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|r| x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+                if over_island == passthrough {
+                    passthrough = !over_island;
+                    let _ = popup.set_ignore_cursor_events(passthrough);
+                }
+            }
+            std::thread::sleep(Duration::from_millis(30));
+        }
+    });
 }
 
 fn spawn_scheduler(app: AppHandle) {
@@ -177,11 +378,14 @@ fn spawn_scheduler(app: AppHandle) {
     });
 }
 
+// ---------- shell ----------
+
 fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let new_note = MenuItem::with_id(app, "new", "Новая заметка", true, None::<&str>)?;
-    let open_config = MenuItem::with_id(app, "config", "Открыть конфиг", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Настройки…", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&new_note, &open_config, &quit])?;
+    let menu = Menu::with_items(app, &[&new_note, &settings, &separator, &quit])?;
 
     TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
@@ -190,7 +394,7 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "new" => show_quick(app),
-            "config" => open_config_file(app),
+            "settings" => show_settings(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -211,8 +415,25 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_quick(app)))
-        .plugin(tauri_plugin_opener::init())
+        // A second launch is a remote control (scripts, Stream Deck):
+        //   (no args)        open the quick window
+        //   --new "text"     open it prefilled
+        //   --add "text"     save right away, dates and reminders included, without any window
+        //   --settings       open the settings
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            let value_of = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).cloned();
+            if args.iter().any(|a| a == "--settings") {
+                show_settings(app);
+            } else if let Some(text) = value_of("--add") {
+                let _ = app.emit_to("quick", "quick-add", text);
+            } else {
+                show_quick(app);
+                if let Some(text) = value_of("--new") {
+                    let _ = app.emit_to("quick", "quick-prefill", text);
+                }
+            }
+        }))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -227,34 +448,62 @@ pub fn run() {
             let dir = app.path().app_config_dir()?;
             let config_path = dir.join("config.json");
             let config = config::load_or_create(&config_path);
-            let vault = config.vault_path.clone().or_else(config::detect_vault);
 
             if let Err(e) = app.global_shortcut().register(config.hotkey.as_str()) {
                 eprintln!("failed to register hotkey {}: {e}", config.hotkey);
             }
-
-            #[cfg(not(debug_assertions))]
-            {
-                use tauri_plugin_autostart::ManagerExt;
-                let autostart = app.autolaunch();
-                if !autostart.is_enabled().unwrap_or(false) {
-                    let _ = autostart.enable();
-                }
+            if let Err(e) = apply_autostart(app.handle(), config.autostart) {
+                eprintln!("{e}");
             }
 
             app.manage(AppState {
-                config,
+                vault: Mutex::new(config::resolve_vault(&config)),
+                config: Mutex::new(config),
                 config_path,
-                vault,
                 store: Mutex::new(Store::load(dir.join("reminders.json"))),
                 pending: Mutex::new(vec![]),
+                popup_rects: Mutex::new(vec![]),
             });
+
+            let settings = window(app.handle(), "settings");
+            let settings_handle = settings.clone();
+            settings.on_window_event(move |event| {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = settings_handle.hide();
+                }
+            });
+
+            #[cfg(windows)]
+            {
+                let handle = app.handle();
+                for (label, result) in [
+                    ("quick", glass::attach_fill(&window(handle, "quick"), PANEL_RADIUS, SHADOW_INSET)),
+                    ("settings", glass::attach_fill(&settings, PANEL_RADIUS, SHADOW_INSET)),
+                    ("popup", glass::attach_layers(&window(handle, "popup"))),
+                ] {
+                    if let Err(e) = result {
+                        eprintln!("glass unavailable for {label}: {e}");
+                    }
+                }
+            }
+            spawn_popup_hit_testing(app.handle().clone());
+
             setup_tray(app.handle())?;
             spawn_scheduler(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_settings,
+            set_hotkey,
+            hotkey_recording,
+            set_vault,
+            set_inbox_folder,
+            set_default_offsets,
+            set_popup_seconds,
+            set_autostart,
+            open_settings,
+            hide_settings,
             save_entry,
             list_reminders,
             delete_reminder,
@@ -263,7 +512,7 @@ pub fn run() {
             quick_resize,
             popup_take_pending,
             popup_layout,
-            open_config,
+            glass_layout,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

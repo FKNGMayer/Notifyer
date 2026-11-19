@@ -1,258 +1,263 @@
 .quick {
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
 }
 
-.quick-input-row {
+/* ---------- input row ---------- */
+
+.q-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 64px;
-  padding: 0 18px 0 20px;
+  gap: 14px;
+  height: 68px;
+  padding: 0 18px 0 18px;
 }
 
-.quick-glyph {
+.q-badge {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(160deg, #8b88ff, #4c3fdc);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.35), 0 2px 6px -1px rgba(60, 50, 200, 0.6);
+  transition: background 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out);
+}
+
+.is-reminder .q-badge {
+  background: linear-gradient(160deg, #ffbe45, #ff8a00);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), 0 2px 6px -1px rgba(255, 140, 0, 0.55);
+}
+
+.is-saved .q-badge {
+  background: linear-gradient(160deg, #4ee07a, #20b04a);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), 0 2px 6px -1px rgba(40, 180, 80, 0.55);
+}
+
+/* Icons cross-fade with a little rotation instead of swapping abruptly. */
+.q-badge-icon {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border-radius: 8px;
-  font-size: 15px;
-  color: var(--accent);
-  background: var(--accent-soft);
-  transition: background 0.2s, color 0.2s, transform 0.25s var(--ease-out);
+  color: white;
+  opacity: 0;
+  transform: scale(0.6) rotate(-20deg);
+  transition: opacity 0.22s var(--ease-out), transform 0.35s var(--ease-out);
 }
 
-.quick-glyph.is-reminder {
-  background: rgba(251, 191, 36, 0.16);
-  color: #fbbf24;
+.q-badge-icon[data-active="true"] {
+  opacity: 1;
+  transform: none;
 }
 
-.is-saved .quick-glyph {
-  background: rgba(52, 211, 153, 0.2);
-  color: #34d399;
-  transform: scale(1.12);
+.q-badge-icon svg circle {
+  fill: #ffd27a;
 }
 
-.quick-input {
+.q-input {
   flex: 1;
   min-width: 0;
   height: 100%;
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  font-size: 20px;
+  color: var(--label);
+  font-size: 21px;
+  font-weight: 450;
+  letter-spacing: -0.018em;
   caret-color: var(--accent);
   user-select: text;
 }
 
-.quick-input::placeholder {
-  color: var(--text-faint);
+.q-input::placeholder {
+  color: var(--label-3);
 }
 
-kbd {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 5px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  font: inherit;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.quick-enter {
+.q-return {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--fill-3);
+  color: var(--label-2);
   opacity: 0;
-  transition: opacity 0.15s;
+  transform: scale(0.85);
+  transition: opacity 0.18s, transform 0.25s var(--ease-out);
 }
 
-.quick-input:not(:placeholder-shown) + .quick-enter {
+.q-return[data-visible="true"] {
   opacity: 1;
+  transform: none;
 }
 
-.quick-section {
-  border-top: 1px solid var(--line);
-  padding: 12px 20px;
-  animation: section-in 0.22s var(--ease-out);
+/* ---------- sections ---------- */
+
+.q-section {
+  margin: 0 10px;
+  padding: 12px 8px;
+  border-top: 0.5px solid var(--separator);
+  animation: section-in 0.32s var(--glass-ease);
 }
 
 @keyframes section-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-6px);
   }
 }
 
-.quick-reminder {
+.q-when {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  padding-left: 10px;
 }
 
-.quick-due {
+.q-due {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 15px;
   font-weight: 600;
-  color: #fde68a;
+  letter-spacing: -0.01em;
+  color: #ffc560;
 }
 
-.quick-due-clear,
-.upcoming-delete {
+.q-due-clear {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--text-faint);
-  transition: background 0.15s, color 0.15s;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--fill-3);
+  color: var(--label-2);
+  transition: background-color 0.15s, color 0.15s;
 }
 
-.quick-due-clear:hover,
-.upcoming-delete:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+.q-due-clear:hover {
+  background: var(--fill);
+  color: var(--label);
 }
 
-.quick-offsets {
+.q-offsets {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.quick-offsets-label {
-  margin-right: 4px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.chip {
-  height: 26px;
-  padding: 0 11px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+.q-offsets-label {
+  margin-right: 6px;
   font-size: 12.5px;
-  color: var(--text-dim);
-  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+  color: var(--label-3);
 }
 
-.chip:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+/* ---------- upcoming ---------- */
+
+.q-upcoming {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
 }
 
-.chip:active {
-  transform: scale(0.96);
-}
-
-.chip.is-on {
-  border-color: rgba(167, 139, 250, 0.5);
-  background: var(--accent-soft);
-  color: #ddd6fe;
-}
-
-.quick-caption {
-  margin-bottom: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.upcoming-row {
+.q-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 34px;
-  margin: 0 -8px;
-  padding: 0 4px 0 8px;
-  border-radius: 8px;
-  transition: background 0.15s;
+  gap: 14px;
+  height: 38px;
+  padding: 0 6px 0 12px;
+  border-radius: 10px;
+  transition: background-color 0.15s;
 }
 
-.upcoming-row:hover {
-  background: var(--surface);
+.q-item:hover {
+  background: var(--fill-3);
 }
 
-.upcoming-text {
+.q-item-when {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 134px;
+  flex: none;
+  font-size: 12.5px;
+  color: var(--label-3);
+}
+
+.q-item-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.q-item-text {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.q-item-delete {
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.q-item:hover .q-item-delete {
+  opacity: 1;
+}
+
+/* ---------- footer ---------- */
+
+.q-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 40px;
+  padding: 0 8px 0 20px;
+  border-top: 0.5px solid var(--separator);
+  background: rgba(0, 0, 0, 0.14);
+  font-size: 12px;
+  color: var(--label-3);
+}
+
+.q-target {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.upcoming-due {
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-dim);
+.q-target-sep {
+  opacity: 0.5;
 }
 
-.upcoming-delete {
-  opacity: 0;
+.q-error {
+  color: var(--red);
 }
 
-.upcoming-row:hover .upcoming-delete {
-  opacity: 1;
-}
-
-.quick-footer {
+.q-hints {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 34px;
-  padding: 0 12px 0 20px;
-  border-top: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.12);
-  font-size: 11.5px;
-  color: var(--text-faint);
-}
-
-.quick-target {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.quick-error {
-  color: var(--danger);
-}
-
-.quick-hints {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  gap: 14px;
   flex: none;
 }
 
-.quick-hints kbd {
-  margin-left: 6px;
+.q-hints kbd {
+  margin-right: 4px;
 }
 
-.quick-config {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  margin-left: 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text-faint);
-  transition: background 0.15s, color 0.15s;
-}
-
-.quick-config:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+.q-hints .icon-button {
+  margin-left: -4px;
 }

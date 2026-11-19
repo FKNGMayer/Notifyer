@@ -1,7 +1,7 @@
 const WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 const MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 
-function plural(n: number, one: string, few: string, many: string) {
+export function plural(n: number, one: string, few: string, many: string) {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return one;
@@ -9,23 +9,30 @@ function plural(n: number, one: string, few: string, many: string) {
   return many;
 }
 
-const time = (d: Date) =>
+export const formatTime = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/** "сегодня, 15:00" / "завтра, 15:00" / "пт, 20 ноя, 15:00". */
-export function formatDue(due: Date, now = new Date()): string {
+/** "Сегодня" / "Завтра" / "Пт, 20 ноя" (+ year when it differs). */
+export function formatDay(due: Date, now = new Date()): string {
   const days = Math.round((startOfDay(due) - startOfDay(now)) / 86_400_000);
-  if (days === 0) return `сегодня, ${time(due)}`;
-  if (days === 1) return `завтра, ${time(due)}`;
+  if (days === 0) return "Сегодня";
+  if (days === 1) return "Завтра";
+  if (days === 2) return "Послезавтра";
+  const weekday = WEEKDAYS[due.getDay()];
   const year = due.getFullYear() !== now.getFullYear() ? ` ${due.getFullYear()}` : "";
-  return `${WEEKDAYS[due.getDay()]}, ${due.getDate()} ${MONTHS[due.getMonth()]}${year}, ${time(due)}`;
+  return `${weekday[0].toUpperCase()}${weekday.slice(1)}, ${due.getDate()} ${MONTHS[due.getMonth()]}${year}`;
 }
 
-/** Short chip label: "1 день", "1 ч", "30 мин". */
+/** "Завтра, 15:00". */
+export function formatDue(due: Date, now = new Date()): string {
+  return `${formatDay(due, now)}, ${formatTime(due)}`;
+}
+
+/** Chip label: "1 день", "1 ч", "30 мин". */
 export function offsetLabel(minutes: number): string {
   if (minutes % 1440 === 0) {
     const d = minutes / 1440;
@@ -35,18 +42,7 @@ export function offsetLabel(minutes: number): string {
   return `${minutes} мин`;
 }
 
-/** Popup headline: "Сейчас" / "Через 30 минут" / "Через 1 час". */
-export function popupTitle(offset: number): string {
-  if (offset === 0) return "Сейчас";
-  if (offset % 1440 === 0) {
-    const d = offset / 1440;
-    return `Через ${d} ${plural(d, "день", "дня", "дней")}`;
-  }
-  if (offset % 60 === 0) {
-    const h = offset / 60;
-    return `Через ${h} ${plural(h, "час", "часа", "часов")}`;
-  }
-  return `Через ${offset} ${plural(offset, "минуту", "минуты", "минут")}`;
+/** "через 30 мин" / "через 1 ч" / "через 1 день". */
+export function inLabel(minutes: number): string {
+  return `через ${offsetLabel(minutes)}`;
 }
-
-export const formatTime = time;
