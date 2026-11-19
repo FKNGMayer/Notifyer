@@ -1,0 +1,175 @@
+.popup-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  position: relative;
+  padding: 16px 18px 18px;
+  overflow: hidden;
+  animation: card-in 0.42s var(--ease-out);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.card + .card {
+  border-top: 1px solid var(--line);
+}
+
+/* Soft glow in the corner tints the acrylic. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -40px auto auto -40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+.card.is-now::before {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.22), transparent 70%);
+}
+
+.card.is-leaving {
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.98);
+  }
+}
+
+.card-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.is-now .card-head {
+  color: #fbbf24;
+}
+
+.card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: pulse 1.6s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+
+.card-title {
+  flex: 1;
+}
+
+.card-time {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+
+.card-text {
+  position: relative;
+  margin: 8px 0 14px;
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-actions {
+  position: relative;
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-dim);
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  border-color: transparent;
+  background: var(--accent-strong);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #7c4ff0;
+  color: white;
+}
+
+.is-now .btn-primary {
+  background: #f59e0b;
+  color: #1c1406;
+}
+
+.is-now .btn-primary:hover {
+  background: #fbbf24;
+  color: #1c1406;
+}
+
+.card-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  animation-name: timer;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.is-now .card-timer {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+@keyframes timer {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}

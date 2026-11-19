@@ -1,7 +1,44 @@
-# Tauri + React + Typescript
+# Notifyer
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Быстрые заметки в Obsidian и напоминания поверх всех окон. Живёт в трее, весит ~10 МБ,
+открывается мгновенно по горячей клавише — тяжёлый Obsidian запускать не нужно.
 
-## Recommended IDE Setup
+## Как пользоваться
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- `Ctrl+Alt+N` — строка ввода. Пишешь мысль, `Enter` — она дописывается в
+  `<хранилище>/Входящие/ГГГГ-ММ-ДД.md`. `Esc` — закрыть.
+- Если во фразе есть дата — создаётся напоминание:
+  `завтра в 15 созвон с Петей`, `в пт 10:00 написать клиенту`, `25 декабря в 7 вечера ужин`,
+  `через 2 часа выключить духовку`, `20.11 продлить домен`.
+  Под полем видно, как дата распознана; `✕` рядом — сохранить как обычную заметку.
+- Чипы «напомнить за» — предварительные напоминания (по умолчанию за 1 ч, 30 мин и 5 мин).
+- Пустое поле показывает ближайшие напоминания, их можно удалить.
+- Попап справа сверху висит 15 секунд: `Готово`, `+10 мин`, `+1 час`.
+
+## Настройки
+
+`%APPDATA%\dev.notifyer.app\config.json` (открывается из трея или кнопкой ⚙),
+применяется после перезапуска:
+
+```json
+{
+  "hotkey": "Ctrl+Alt+N",
+  "vaultPath": null,
+  "inboxFolder": "Входящие",
+  "defaultOffsets": [60, 30, 5]
+}
+```
+
+`vaultPath: null` — хранилище берётся из настроек самого Obsidian (открытое или последнее).
+
+## Разработка
+
+Нужны Node.js, Rust и Visual Studio Build Tools (C++).
+
+```sh
+npm install
+npm run tauri dev      # запуск в режиме разработки
+npm test               # тесты парсера дат
+cargo test --manifest-path src-tauri/Cargo.toml   # тесты Rust
+npm run tauri build    # установщик в src-tauri/target/release/bundle/nsis
+```

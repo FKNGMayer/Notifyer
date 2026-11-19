@@ -1,0 +1,47 @@
+:root {
+  --text: #f4f3f8;
+  --text-dim: rgba(244, 243, 248, 0.56);
+  --text-faint: rgba(244, 243, 248, 0.34);
+  --line: rgba(255, 255, 255, 0.08);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.09);
+  --accent: #a78bfa;
+  --accent-strong: #8b5cf6;
+  --accent-soft: rgba(167, 139, 250, 0.16);
+  --danger: #fb7185;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: auto;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+html {
+  /* Dark tint over the acrylic window effect (Windows 11 ignores the native tint colour). */
+  background: rgba(10, 10, 16, 0.62);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}

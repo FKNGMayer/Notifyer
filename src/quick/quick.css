@@ -1,0 +1,258 @@
+.quick {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+
+.quick-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 18px 0 20px;
+}
+
+.quick-glyph {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  font-size: 15px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  transition: background 0.2s, color 0.2s, transform 0.25s var(--ease-out);
+}
+
+.quick-glyph.is-reminder {
+  background: rgba(251, 191, 36, 0.16);
+  color: #fbbf24;
+}
+
+.is-saved .quick-glyph {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
+  transform: scale(1.12);
+}
+
+.quick-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  font-size: 20px;
+  caret-color: var(--accent);
+  user-select: text;
+}
+
+.quick-input::placeholder {
+  color: var(--text-faint);
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.quick-enter {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.quick-input:not(:placeholder-shown) + .quick-enter {
+  opacity: 1;
+}
+
+.quick-section {
+  border-top: 1px solid var(--line);
+  padding: 12px 20px;
+  animation: section-in 0.22s var(--ease-out);
+}
+
+@keyframes section-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.quick-reminder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quick-due {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fde68a;
+}
+
+.quick-due-clear,
+.upcoming-delete {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  transition: background 0.15s, color 0.15s;
+}
+
+.quick-due-clear:hover,
+.upcoming-delete:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.quick-offsets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-offsets-label {
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.chip {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.chip:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.chip.is-on {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: var(--accent-soft);
+  color: #ddd6fe;
+}
+
+.quick-caption {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.upcoming-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 34px;
+  margin: 0 -8px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.upcoming-row:hover {
+  background: var(--surface);
+}
+
+.upcoming-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.upcoming-due {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.upcoming-delete {
+  opacity: 0;
+}
+
+.upcoming-row:hover .upcoming-delete {
+  opacity: 1;
+}
+
+.quick-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 34px;
+  padding: 0 12px 0 20px;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.12);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.quick-target {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.quick-error {
+  color: var(--danger);
+}
+
+.quick-hints {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
+.quick-hints kbd {
+  margin-left: 6px;
+}
+
+.quick-config {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-faint);
+  transition: background 0.15s, color 0.15s;
+}
+
+.quick-config:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
