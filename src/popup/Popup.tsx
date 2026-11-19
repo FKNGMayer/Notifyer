@@ -6,12 +6,12 @@ import { formatTime, inLabel } from "../lib/format";
 import "./popup.css";
 
 // Geometry of the island stack, in CSS px. The glass panes follow these exact rects.
-const WINDOW_WIDTH = 640;
+const WINDOW_WIDTH = 760;
 const TOP = 12;
 const GAP = 10;
-const SHADOW_ROOM = 28;
-const EVENT_HEIGHT = 56;
-const HEADS_UP_HEIGHT = 40;
+const SHADOW_ROOM = 40; // --shadow-room
+const EVENT_HEIGHT = 60;
+const HEADS_UP_HEIGHT = 42;
 const LEAVE_MS = 380; // --glass-duration
 
 interface Card extends PopupCard {
@@ -33,7 +33,8 @@ export default function Popup() {
   const [measures, setMeasures] = useState<Record<string, Measure>>({});
   const [hovered, setHovered] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(15);
-  const nodes = useRef<Record<string, { main: HTMLElement | null; actions: HTMLElement | null }>>({});
+  /** Natural-width row and its always-visible part, per island. */
+  const nodes = useRef<Record<string, { row: HTMLElement | null; main: HTMLElement | null }>>({});
   const lastRects = useRef<Record<string, GlassRect>>({});
 
   const pull = useCallback(async () => {
@@ -60,8 +61,10 @@ export default function Popup() {
     const next = { ...measures };
     for (const card of missing) {
       const n = nodes.current[card.id];
-      if (!n?.main) continue;
-      next[card.id] = { base: Math.ceil(n.main.offsetWidth), extra: Math.ceil(n.actions?.scrollWidth ?? 0) };
+      if (!n?.main || !n.row) continue;
+      // The row is max-content wide, so it includes every gap and padding of the actions.
+      const base = Math.ceil(n.main.getBoundingClientRect().width);
+      next[card.id] = { base, extra: Math.ceil(n.row.getBoundingClientRect().width) - base };
     }
     setMeasures(next);
   }, [cards, measures]);
@@ -137,11 +140,16 @@ export default function Popup() {
             onMouseLeave={() => setHovered((h) => (h === card.id ? null : h))}
             onClick={() => dismiss(card.id)}
           >
-            <div className="island-row">
+            <div
+              className="island-row"
+              ref={(el) => {
+                nodes.current[card.id] = { main: nodes.current[card.id]?.main ?? null, row: el };
+              }}
+            >
               <div
                 className="island-main"
                 ref={(el) => {
-                  nodes.current[card.id] = { ...nodes.current[card.id], main: el, actions: nodes.current[card.id]?.actions ?? null };
+                  nodes.current[card.id] = { row: nodes.current[card.id]?.row ?? null, main: el };
                 }}
               >
                 <span className="ring">
@@ -163,13 +171,7 @@ export default function Popup() {
                 <span className="island-text">{card.text}</span>
               </div>
               {event && (
-                <div
-                  className="island-actions"
-                  ref={(el) => {
-                    nodes.current[card.id] = { main: nodes.current[card.id]?.main ?? null, actions: el };
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <div className="island-actions" onClick={(e) => e.stopPropagation()}>
                   <button className="island-button" onClick={() => snooze(card, 10)}>
                     10 мин
                   </button>

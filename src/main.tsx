@@ -2,10 +2,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "@fontsource-variable/inter";
+// Shared styles first: component stylesheets override them.
+import "./styles/base.css";
 import Quick from "./quick/Quick";
 import Popup from "./popup/Popup";
 import Settings from "./settings/Settings";
-import "./styles/base.css";
 
 // All windows load the same bundle; the window label decides what to render.
 const label = getCurrentWindow().label;

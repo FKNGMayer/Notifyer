@@ -17,10 +17,11 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewW
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-/// Transparent margin around glass panels, leaves room for the CSS shadow.
-const SHADOW_INSET: f64 = 28.0;
+/// Transparent margin around glass panels, leaves room for the CSS shadow (`--shadow-room`).
+const SHADOW_INSET: f64 = 40.0;
 const QUICK_WIDTH: f64 = 640.0 + 2.0 * SHADOW_INSET;
-const POPUP_WIDTH: f64 = 640.0;
+/// Wide enough for the longest expanded island plus its shadow.
+const POPUP_WIDTH: f64 = 760.0;
 const SETTINGS_WIDTH: f64 = 560.0 + 2.0 * SHADOW_INSET;
 const PANEL_RADIUS: f64 = 20.0;
 
@@ -297,14 +298,17 @@ fn popup_take_pending(state: tauri::State<AppState>) -> Vec<Popup> {
     std::mem::take(&mut *state.pending.lock().unwrap())
 }
 
-/// Sizes the popup to its islands and pins it to the top centre; height 0 hides it.
+/// Sizes the popup to its islands and pins it to the top centre.
+///
+/// The popup window is shown once at startup and never hidden: showing a window activates
+/// it, which would steal focus from the quick window mid-sentence. With no islands it is
+/// one pixel tall and lets every click through.
 #[tauri::command]
 fn popup_layout(app: AppHandle, height: f64) {
-    let w = window(&app, "popup");
-    if height <= 0.0 {
-        let _ = w.hide();
-        return;
-    }
+    place_popup(&window(&app, "popup"), height.max(1.0));
+}
+
+fn place_popup(w: &WebviewWindow, height: f64) {
     let _ = w.set_size(LogicalSize::new(POPUP_WIDTH, height));
     if let Ok(Some(monitor)) = w.primary_monitor() {
         let area = monitor.work_area();
@@ -312,11 +316,9 @@ fn popup_layout(app: AppHandle, height: f64) {
         let x = area.position.x + (area.size.width as i32 - width) / 2;
         let _ = w.set_position(PhysicalPosition::new(x, area.position.y));
     }
-    if !w.is_visible().unwrap_or(false) {
-        let _ = w.set_ignore_cursor_events(true);
-        let _ = w.show();
-    }
 }
+
+
 
 /// A glass pane in CSS pixels relative to the window's client area.
 #[derive(Deserialize, Clone, Debug)]
@@ -345,8 +347,11 @@ fn spawn_popup_hit_testing(app: AppHandle) {
         let mut passthrough = true;
         loop {
             let popup = window(&app, "popup");
-            if !popup.is_visible().unwrap_or(false) {
-                passthrough = true;
+            if app.state::<AppState>().popup_rects.lock().unwrap().is_empty() {
+                if !passthrough {
+                    passthrough = true;
+                    let _ = popup.set_ignore_cursor_events(true);
+                }
                 std::thread::sleep(Duration::from_millis(250));
                 continue;
             }
@@ -471,6 +476,17 @@ pub fn run() {
                 pending: Mutex::new(vec![]),
                 popup_rects: Mutex::new(vec![]),
             });
+
+            // Windows are created only now, once the state their commands rely on exists
+            // (`"create": false` in tauri.conf.json); otherwise early invokes fail.
+            for config in app.config().app.windows.clone() {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?.build()?;
+            }
+
+            let popup = window(app.handle(), "popup");
+            let _ = popup.set_ignore_cursor_events(true);
+            place_popup(&popup, 1.0);
+            let _ = popup.show();
 
             let settings = window(app.handle(), "settings");
             let settings_handle = settings.clone();

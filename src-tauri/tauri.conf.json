@@ -14,7 +14,7 @@
       {
         "label": "quick",
         "title": "Notifyer",
-        "width": 696,
+        "width": 720,
         "height": 140,
         "visible": false,
         "decorations": false,
@@ -25,12 +25,13 @@
         "minimizable": false,
         "theme": "Dark",
         "alwaysOnTop": true,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "create": false
       },
       {
         "label": "popup",
         "title": "Notifyer — напоминание",
-        "width": 640,
+        "width": 760,
         "height": 120,
         "visible": false,
         "decorations": false,
@@ -43,12 +44,13 @@
         "focus": false,
         "focusable": false,
         "alwaysOnTop": true,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "create": false
       },
       {
         "label": "settings",
         "title": "Настройки Notifyer",
-        "width": 616,
+        "width": 640,
         "height": 720,
         "visible": false,
         "decorations": false,
@@ -58,7 +60,8 @@
         "maximizable": false,
         "minimizable": false,
         "theme": "Dark",
-        "center": true
+        "center": true,
+        "create": false
       }
     ],
     "security": {
