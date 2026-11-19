@@ -19,9 +19,9 @@ describe("parseDate", () => {
   });
 
   it("parses day words with time and strips them from text", () => {
-    const r = parse("завтра в 15:00 созвон с Петей");
+    const r = parse("завтра в 15:00 созвон с командой");
     expect(r?.due).toEqual(at(2026, 11, 20, 15));
-    expect(r?.text).toBe("Созвон с Петей");
+    expect(r?.text).toBe("Созвон с командой");
   });
 
   it("parses day words without time as 09:00", () => {

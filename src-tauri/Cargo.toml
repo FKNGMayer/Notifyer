@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Quick notes to Obsidian and reminders"
 authors = ["Notifyer contributors"]
 edition = "2024"
+license = "MIT"
 
 [lib]
 # The `_lib` suffix avoids a name clash between the lib and bin targets on Windows.
