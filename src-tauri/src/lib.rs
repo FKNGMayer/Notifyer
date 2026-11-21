@@ -318,7 +318,21 @@ fn place_popup(w: &WebviewWindow, height: f64) {
     }
 }
 
+/// The camera notch of the screen the islands are on, in CSS px.
+#[derive(Serialize, Clone, Copy, Debug)]
+pub struct Notch {
+    pub width: f64,
+    pub height: f64,
+}
 
+#[tauri::command]
+fn popup_notch() -> Option<Notch> {
+    None
+}
+
+/// Called after the user clicks an island.
+#[tauri::command]
+fn release_focus() {}
 
 /// A glass pane in CSS pixels relative to the window's client area.
 #[derive(Deserialize, Clone, Debug)]
@@ -536,6 +550,8 @@ pub fn run() {
             quick_resize,
             popup_take_pending,
             popup_layout,
+            popup_notch,
+            release_focus,
             glass_layout,
         ])
         .run(tauri::generate_context!())

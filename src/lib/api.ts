@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Notch } from "./islands";
 
 export interface Settings {
   hotkey: string;
@@ -60,5 +61,9 @@ export const api = {
 
   popupTakePending: () => invoke<PopupCard[]>("popup_take_pending"),
   popupLayout: (height: number) => invoke<void>("popup_layout", { height }),
+  /** The notch of the screen the islands are on; null on Windows and screens without one. */
+  popupNotch: () => invoke<Notch | null>("popup_notch"),
+  /** macOS: a click on an island activates the app; hand focus back to the previous one. */
+  releaseFocus: () => invoke<void>("release_focus"),
   glassLayout: (rects: GlassRect[]) => invoke<void>("glass_layout", { rects }),
 };

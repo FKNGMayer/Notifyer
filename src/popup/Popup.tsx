@@ -3,11 +3,14 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Bell, Check, Clock } from "lucide-react";
 import { api, type GlassRect, type PopupCard } from "../lib/api";
 import { formatTime, inLabel } from "../lib/format";
+import { layoutIslands, type IslandRect, type Notch } from "../lib/islands";
+import { isMac } from "../lib/platform";
 import "./popup.css";
 
 // Geometry of the island stack, in CSS px. The glass panes follow these exact rects.
 const WINDOW_WIDTH = 760;
-const TOP = 12;
+// On macOS the window starts at the very top of the screen, over the menu bar.
+const TOP = isMac ? 8 : 12;
 const GAP = 10;
 const SHADOW_ROOM = 40; // --shadow-room
 const EVENT_HEIGHT = 60;
@@ -26,6 +29,7 @@ interface Measure {
 }
 
 const isEvent = (card: PopupCard) => card.offset === 0;
+const glassOf = ({ id, x, y, w, h, radius }: IslandRect): GlassRect => ({ id, x, y, w, h, radius });
 const heightOf = (card: PopupCard) => (isEvent(card) ? EVENT_HEIGHT : HEADS_UP_HEIGHT);
 
 export default function Popup() {
@@ -33,12 +37,15 @@ export default function Popup() {
   const [measures, setMeasures] = useState<Record<string, Measure>>({});
   const [hovered, setHovered] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(15);
+  const [notch, setNotch] = useState<Notch | null>(null);
   /** Natural-width row and its always-visible part, per island. */
   const nodes = useRef<Record<string, { row: HTMLElement | null; main: HTMLElement | null }>>({});
-  const lastRects = useRef<Record<string, GlassRect>>({});
+  const lastRects = useRef<Record<string, IslandRect>>({});
 
   const pull = useCallback(async () => {
-    const fresh = await api.popupTakePending();
+    // The notch is asked every time: the main screen may have changed since the last island.
+    const [fresh, currentNotch] = await Promise.all([api.popupTakePending(), api.popupNotch()]);
+    setNotch(currentNotch);
     // Islands are sized by measuring text, so the real font must be in place first.
     await document.fonts.load('600 15px "Inter Variable"').catch(() => undefined);
     if (fresh.length) setCards((current) => [...fresh.reverse(), ...current]);
@@ -70,30 +77,27 @@ export default function Popup() {
   }, [cards, measures]);
 
   const rects = useMemo(() => {
-    const result: Record<string, GlassRect> = {};
-    let y = TOP;
+    const result: Record<string, IslandRect> = {};
+    // Leaving islands stay where they were while they slide out.
     for (const card of cards) {
-      const m = measures[card.id];
-      if (!m) continue;
-      if (card.leaving) {
-        if (lastRects.current[card.id]) result[card.id] = lastRects.current[card.id];
-        continue;
-      }
-      const h = heightOf(card);
-      const w = m.base + (hovered === card.id ? m.extra : 0);
-      result[card.id] = { id: card.id, x: (WINDOW_WIDTH - w) / 2, y, w, h, radius: h / 2 };
-      y += h + GAP;
+      if (card.leaving && lastRects.current[card.id]) result[card.id] = lastRects.current[card.id];
     }
+    const placed = cards.filter((c) => !c.leaving && measures[c.id]);
+    const laid = layoutIslands(
+      placed.map((c) => ({ id: c.id, height: heightOf(c), ...measures[c.id], open: hovered === c.id })),
+      { width: WINDOW_WIDTH, top: TOP, gap: GAP, notch },
+    );
+    for (const rect of laid) result[rect.id] = rect;
     lastRects.current = { ...lastRects.current, ...result };
     return result;
-  }, [cards, measures, hovered]);
+  }, [cards, measures, hovered, notch]);
 
   // Drive the native side: window height and the glass panes under the islands.
   useEffect(() => {
     const all = Object.values(rects);
     const height = all.length ? Math.max(...all.map((r) => r.y + r.h)) + SHADOW_ROOM : 0;
     api.popupLayout(height);
-    api.glassLayout(cards.filter((c) => !c.leaving && rects[c.id]).map((c) => rects[c.id]));
+    api.glassLayout(cards.filter((c) => !c.leaving && rects[c.id]).map((c) => glassOf(rects[c.id])));
   }, [rects, cards]);
 
   const dismiss = useCallback((id: string) => {
@@ -106,9 +110,15 @@ export default function Popup() {
     }, LEAVE_MS);
   }, []);
 
+  /** Dismissed by the user, as opposed to the timer running out. */
+  const close = (id: string) => {
+    dismiss(id);
+    api.releaseFocus();
+  };
+
   const snooze = async (card: Card, minutes: number) => {
     await api.snooze(card.text, minutes);
-    dismiss(card.id);
+    close(card.id);
   };
 
   return (
@@ -122,6 +132,9 @@ export default function Popup() {
               top: rect.y,
               width: rect.w,
               height: rect.h,
+              paddingTop: rect.pad,
+              paddingLeft: rect.inset,
+              borderRadius: rect.notched ? `0 0 ${rect.radius}px ${rect.radius}px` : rect.radius,
               "--travel": `${-(rect.y + rect.h + 24)}px`,
             } as React.CSSProperties)
           : undefined;
@@ -132,13 +145,14 @@ export default function Popup() {
               "island",
               event ? "is-event" : "is-heads-up",
               rect ? "is-placed" : "",
+              rect?.notched ? "is-notched" : "",
               card.leaving ? "is-leaving" : "",
               hovered === card.id ? "is-open" : "",
             ].join(" ")}
             style={style}
             onMouseEnter={() => !card.leaving && setHovered(card.id)}
             onMouseLeave={() => setHovered((h) => (h === card.id ? null : h))}
-            onClick={() => dismiss(card.id)}
+            onClick={() => close(card.id)}
           >
             <div
               className="island-row"
@@ -178,7 +192,7 @@ export default function Popup() {
                   <button className="island-button" onClick={() => snooze(card, 60)}>
                     1 ч
                   </button>
-                  <button className="island-done" aria-label="Готово" onClick={() => dismiss(card.id)}>
+                  <button className="island-done" aria-label="Готово" onClick={() => close(card.id)}>
                     <Check size={16} strokeWidth={2.8} />
                   </button>
                 </div>

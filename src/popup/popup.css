@@ -16,6 +16,9 @@
     left var(--glass-duration) var(--glass-ease),
     top var(--glass-duration) var(--glass-ease),
     width var(--glass-duration) var(--glass-ease),
+    height var(--glass-duration) var(--glass-ease),
+    padding var(--glass-duration) var(--glass-ease),
+    border-radius var(--glass-duration) var(--glass-ease),
     transform var(--glass-duration) var(--glass-ease),
     opacity var(--glass-duration) var(--glass-ease);
 }
@@ -33,6 +36,15 @@
   border-radius: inherit;
   box-shadow: var(--glass-edge);
   pointer-events: none;
+}
+
+/* macOS: solid black like Dynamic Island, so the top island merges with the notch. */
+:root[data-platform="mac"] .island {
+  background: #000;
+}
+
+.island.is-notched::after {
+  box-shadow: none;
 }
 
 .island.is-placed {
