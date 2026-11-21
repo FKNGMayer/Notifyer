@@ -6,6 +6,7 @@ import AppGlyph from "../components/AppGlyph";
 import { api, type Settings as SettingsData } from "../lib/api";
 import { offsetLabel } from "../lib/format";
 import { acceleratorFromEvent, keycaps } from "../lib/hotkey";
+import { isMac } from "../lib/platform";
 import "./settings.css";
 
 const OFFSET_PRESETS = [1440, 180, 60, 30, 15, 5];
@@ -156,7 +157,7 @@ export default function Settings() {
           </Section>
 
           <Section title="Система">
-            <Row label="Запускать вместе с Windows">
+            <Row label={isMac ? "Открывать при входе в систему" : "Запускать вместе с Windows"}>
               <Switch checked={settings.autostart} onChange={(v) => apply(api.setAutostart(v))} />
             </Row>
           </Section>

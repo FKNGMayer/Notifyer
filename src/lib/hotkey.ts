@@ -1,5 +1,7 @@
 // Converts keyboard events to global-shortcut accelerators ("Ctrl+Alt+N") and back to keycaps.
 
+import { isMac } from "./platform";
+
 const MODIFIER_CODES = new Set([
   "ControlLeft",
   "ControlRight",
@@ -50,6 +52,16 @@ const KEYCAP_NAMES: Record<string, string> = {
   ArrowRight: "→",
 };
 
-export function keycaps(accelerator: string): string[] {
-  return accelerator.split("+").map((part) => KEYCAP_NAMES[part] ?? part);
+const MAC_KEYCAP_NAMES: Record<string, string> = {
+  ...KEYCAP_NAMES,
+  Ctrl: "⌃",
+  Alt: "⌥",
+  Shift: "⇧",
+  Super: "⌘",
+  Enter: "↩",
+};
+
+export function keycaps(accelerator: string, mac = isMac): string[] {
+  const names = mac ? MAC_KEYCAP_NAMES : KEYCAP_NAMES;
+  return accelerator.split("+").map((part) => names[part] ?? part);
 }

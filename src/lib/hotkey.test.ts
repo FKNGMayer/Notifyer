@@ -30,7 +30,12 @@ describe("acceleratorFromEvent", () => {
 
 describe("keycaps", () => {
   it("splits and humanises accelerators", () => {
-    expect(keycaps("Ctrl+Alt+N")).toEqual(["Ctrl", "Alt", "N"]);
-    expect(keycaps("Super+Space")).toEqual(["Win", "Пробел"]);
+    expect(keycaps("Ctrl+Alt+N", false)).toEqual(["Ctrl", "Alt", "N"]);
+    expect(keycaps("Super+Space", false)).toEqual(["Win", "Пробел"]);
+  });
+
+  it("uses Mac symbols on macOS", () => {
+    expect(keycaps("Ctrl+Alt+Shift+Super+N", true)).toEqual(["⌃", "⌥", "⇧", "⌘", "N"]);
+    expect(keycaps("Super+Space", true)).toEqual(["⌘", "Пробел"]);
   });
 });
