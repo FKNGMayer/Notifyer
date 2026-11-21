@@ -115,8 +115,9 @@
   animation-fill-mode: forwards;
 }
 
-/* Paused while the pointer is on the island. */
-.island:hover .ring-progress {
+/* Paused while the pointer is on the island (on macOS hover comes from `is-open`). */
+.island:hover .ring-progress,
+.island.is-open .ring-progress {
   animation-play-state: paused;
 }
 

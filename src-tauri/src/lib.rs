@@ -20,7 +20,7 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// Transparent margin around glass panels, leaves room for the CSS shadow (`--shadow-room`).
-/// macOS draws a native shadow instead, so there the window is exactly the panel.
+/// macOS has no CSS shadow (see `mac_window_config`), so there the window is exactly the panel.
 const SHADOW_INSET: f64 = if cfg!(target_os = "macos") { 0.0 } else { 40.0 };
 const QUICK_WIDTH: f64 = 640.0 + 2.0 * SHADOW_INSET;
 /// Wide enough for the longest expanded island plus its shadow.
@@ -46,6 +46,7 @@ fn window(app: &AppHandle, label: &str) -> WebviewWindow {
     app.get_webview_window(label).expect("window is declared in tauri.conf.json")
 }
 
+#[cfg(windows)]
 fn on_main(app: &AppHandle, f: impl FnOnce() + Send + 'static) {
     let _ = app.run_on_main_thread(f);
 }
@@ -97,10 +98,7 @@ fn quick_resize(app: AppHandle, height: f64) {
 }
 
 fn resize_panel(app: &AppHandle, label: &str, size: LogicalSize<f64>) {
-    let w = window(app, label);
-    let _ = w.set_size(size);
-    #[cfg(target_os = "macos")]
-    on_main(app, move || mac::invalidate_shadow(&w));
+    let _ = window(app, label).set_size(size);
 }
 
 /// Hides the quick or settings window. On macOS the app hides too once neither is left:
@@ -398,9 +396,19 @@ fn glass_layout(app: AppHandle, window: WebviewWindow, rects: Vec<GlassRect>) {
 }
 
 /// The popup window is wide and transparent; only its islands should catch the mouse.
+///
+/// On macOS it also reports which island is under the cursor (`popup-hover`): the island
+/// window never becomes key, and WKWebView gets no mouse moves in a window that is not.
 fn spawn_popup_hit_testing(app: AppHandle) {
     std::thread::spawn(move || {
         let mut passthrough = true;
+        let mut hovered: Option<String> = None;
+        let mut report = |island: Option<String>| {
+            if cfg!(target_os = "macos") && island != hovered {
+                let _ = app.emit_to("popup", "popup-hover", &island);
+            }
+            hovered = island;
+        };
         loop {
             let popup = window(&app, "popup");
             if app.state::<AppState>().popup_rects.lock().unwrap().is_empty() {
@@ -408,6 +416,7 @@ fn spawn_popup_hit_testing(app: AppHandle) {
                     passthrough = true;
                     let _ = popup.set_ignore_cursor_events(true);
                 }
+                report(None);
                 std::thread::sleep(Duration::from_millis(250));
                 continue;
             }
@@ -416,13 +425,16 @@ fn spawn_popup_hit_testing(app: AppHandle) {
             {
                 let x = (cursor.x - origin.x as f64) / scale;
                 let y = (cursor.y - origin.y as f64) / scale;
-                let over_island = app
+                let island = app
                     .state::<AppState>()
                     .popup_rects
                     .lock()
                     .unwrap()
                     .iter()
-                    .any(|r| x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+                    .find(|r| x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)
+                    .map(|r| r.id.clone());
+                let over_island = island.is_some();
+                report(island);
                 if over_island == passthrough {
                     passthrough = !over_island;
                     let _ = popup.set_ignore_cursor_events(passthrough);
@@ -491,8 +503,10 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// macOS draws the glass and the shadow natively. The island window is never key, so it has
-/// to take the first click itself instead of spending it on activation.
+/// macOS draws the glass natively; Liquid Glass brings its own rim. No window shadow: for a
+/// frameless window macOS outlines the rectangular frame, not the rounded glass. The island
+/// window is never key, so it has to take the first click itself instead of spending it on
+/// activation.
 #[cfg(target_os = "macos")]
 fn mac_window_config(mut config: tauri::utils::config::WindowConfig) -> tauri::utils::config::WindowConfig {
     use tauri::utils::config::WindowEffectsConfig;
@@ -501,7 +515,6 @@ fn mac_window_config(mut config: tauri::utils::config::WindowConfig) -> tauri::u
         config.accept_first_mouse = true;
         return config;
     }
-    config.shadow = true;
     config.window_effects = Some(WindowEffectsConfig {
         // Liquid Glass on macOS 26+, the HUD material before it.
         effects: vec![Effect::LiquidGlassRegular, Effect::HudWindow],

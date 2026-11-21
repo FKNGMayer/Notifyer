@@ -58,6 +58,9 @@ export default function Popup() {
     pull();
     const win = getCurrentWebviewWindow();
     const subscriptions = [win.listen("popup-ping", pull), win.listen("settings-changed", loadSeconds)];
+    // The island window is never key on macOS, so WKWebView sees no mouse moves; the native
+    // hit testing reports the island under the cursor instead.
+    if (isMac) subscriptions.push(win.listen<string | null>("popup-hover", (e) => setHovered(e.payload)));
     return () => subscriptions.forEach((p) => p.then((unlisten) => unlisten()));
   }, [pull]);
 
@@ -150,8 +153,8 @@ export default function Popup() {
               hovered === card.id ? "is-open" : "",
             ].join(" ")}
             style={style}
-            onMouseEnter={() => !card.leaving && setHovered(card.id)}
-            onMouseLeave={() => setHovered((h) => (h === card.id ? null : h))}
+            onMouseEnter={isMac ? undefined : () => !card.leaving && setHovered(card.id)}
+            onMouseLeave={isMac ? undefined : () => setHovered((h) => (h === card.id ? null : h))}
             onClick={() => close(card.id)}
           >
             <div

@@ -1,4 +1,4 @@
-//! macOS specifics Tauri does not cover: the notch, the island window level, window shadows.
+//! macOS specifics Tauri does not cover: the notch and the island window level.
 //!
 //! The glass itself is Tauri's window effects (see `mac_window_config` in lib.rs). AppKit
 //! objects are main-thread only; `notch` hops there, the rest is called from it.
@@ -62,12 +62,4 @@ pub fn raise_popup(window: &WebviewWindow) {
             | NSWindowCollectionBehavior::IgnoresCycle,
     );
     w.setCanHide(false);
-}
-
-/// A transparent window keeps the shadow of its previous size until told to redraw it.
-/// Main thread only.
-pub fn invalidate_shadow(window: &WebviewWindow) {
-    if let Some(w) = ns_window(window) {
-        w.invalidateShadow();
-    }
 }
