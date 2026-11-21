@@ -166,7 +166,7 @@ export default function Settings() {
             <span className="s-footer-mark">
               <AppGlyph size={14} />
             </span>
-            Notifyer 0.2.0
+            Notifyer 0.2.1
           </footer>
         </div>
 
