@@ -9,8 +9,9 @@
 <br />
 
 [![Скачать для Windows](https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C_%D0%B4%D0%BB%D1%8F_Windows-6E5BFF?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/FKNGMayer/Notifyer/releases/latest/download/Notifyer-setup.exe)
+[![Скачать для macOS](https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C_%D0%B4%D0%BB%D1%8F_macOS-1D1D1F?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/FKNGMayer/Notifyer/releases/latest/download/Notifyer.dmg)
 
-<sub>Windows 11 · 2 МБ · <a href="https://github.com/FKNGMayer/Notifyer/releases">все версии</a></sub>
+<sub>Windows 11 · macOS (Apple Silicon и Intel) · <a href="https://github.com/FKNGMayer/Notifyer/releases">все версии</a></sub>
 
 <br />
 <br />
@@ -23,7 +24,7 @@
 
 ## Записать мысль
 
-<kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>N</kbd> из любого окна → пишешь → <kbd>Enter</kbd>.
+<kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>N</kbd> (на Mac <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>N</kbd>) из любого окна → пишешь → <kbd>Enter</kbd>.
 
 Строка с временем уходит в `Входящие/ГГГГ-ММ-ДД.md` твоего хранилища Obsidian. Сам Obsidian может быть закрыт, а с Obsidian Sync запись сразу появится и на телефоне.
 
@@ -46,7 +47,7 @@
 
 <img src="docs/assets/island.png" alt="Напоминание-остров" width="560" />
 
-Напоминание выезжает сверху экрана поверх всех окон. Наведи курсор — отсчёт встанет на паузу, появятся «10 мин», «1 ч» и ✓. Клик по острову — готово.
+Напоминание выезжает сверху экрана поверх всех окон. На Mac с вырезом камеры остров вырастает прямо из выреза, как Dynamic Island. Наведи курсор — отсчёт встанет на паузу, появятся «10 мин», «1 ч» и ✓. Клик по острову — готово.
 Предупреждения заранее маленькие и не отвлекают. Пропущенное, пока компьютер был выключен, покажется при включении.
 
 ## Настройки
@@ -57,7 +58,7 @@
 
 Хранилище Obsidian находится само, папку для заметок можно поменять.
 
-Напоминания по умолчанию, время показа острова, автозапуск вместе с Windows.
+Напоминания по умолчанию, время показа острова, автозапуск.
 
 Всё применяется сразу.
 
@@ -71,8 +72,10 @@ Notifyer.exe --new "текст"                 открыть строку с �
 Notifyer.exe --settings                    открыть настройки
 ```
 
+На Mac то же самое через `/Applications/Notifyer.app/Contents/MacOS/Notifyer --add "…"`.
+
 <br />
 
 ---
 
-<sub>Установщик не подписан сертификатом, поэтому при первом запуске Windows SmartScreen может попросить подтверждение. Лицензия [MIT](LICENSE).</sub>
+<sub>Приложение не подписано сертификатом. Windows SmartScreen при первом запуске может попросить подтверждение. На Mac перетащи Notifyer в «Программы», открой его, а когда macOS откажется запускать, нажми «Всё равно открыть» в «Системные настройки → Конфиденциальность и безопасность». Если вместо этого пишет, что приложение повреждено, выполни в Терминале `xattr -dr com.apple.quarantine /Applications/Notifyer.app`. Лицензия [MIT](LICENSE).</sub>
