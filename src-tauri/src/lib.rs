@@ -1,6 +1,8 @@
 mod config;
 #[cfg(windows)]
 mod glass;
+#[cfg(target_os = "macos")]
+mod mac;
 mod reminders;
 mod vault;
 
@@ -18,7 +20,8 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// Transparent margin around glass panels, leaves room for the CSS shadow (`--shadow-room`).
-const SHADOW_INSET: f64 = 40.0;
+/// macOS draws a native shadow instead, so there the window is exactly the panel.
+const SHADOW_INSET: f64 = if cfg!(target_os = "macos") { 0.0 } else { 40.0 };
 const QUICK_WIDTH: f64 = 640.0 + 2.0 * SHADOW_INSET;
 /// Wide enough for the longest expanded island plus its shadow.
 const POPUP_WIDTH: f64 = 760.0;
@@ -57,6 +60,8 @@ fn focus(w: &WebviewWindow) {
 // ---------- quick window ----------
 
 fn show_quick(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.show();
     let w = window(app, "quick");
     if let Ok(Some(monitor)) = w.current_monitor().or_else(|_| w.primary_monitor()) {
         let area = monitor.work_area();
@@ -75,7 +80,7 @@ fn show_quick(app: &AppHandle) {
 fn toggle_quick(app: &AppHandle) {
     let w = window(app, "quick");
     if w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false) {
-        let _ = w.hide();
+        hide_panel(app, "quick");
     } else {
         show_quick(app);
     }
@@ -83,12 +88,41 @@ fn toggle_quick(app: &AppHandle) {
 
 #[tauri::command]
 fn hide_quick(app: AppHandle) {
-    let _ = window(&app, "quick").hide();
+    hide_panel(&app, "quick");
 }
 
 #[tauri::command]
 fn quick_resize(app: AppHandle, height: f64) {
-    let _ = window(&app, "quick").set_size(LogicalSize::new(QUICK_WIDTH, height));
+    resize_panel(&app, "quick", LogicalSize::new(QUICK_WIDTH, height));
+}
+
+fn resize_panel(app: &AppHandle, label: &str, size: LogicalSize<f64>) {
+    let w = window(app, label);
+    let _ = w.set_size(size);
+    #[cfg(target_os = "macos")]
+    on_main(app, move || mac::invalidate_shadow(&w));
+}
+
+/// Hides the quick or settings window. On macOS the app hides too once neither is left:
+/// that is what hands the keyboard back to the app the user came from.
+fn hide_panel(app: &AppHandle, label: &str) {
+    let _ = window(app, label).hide();
+    release_focus(app.clone());
+}
+
+/// Also called after the user clicks an island, which activates the app on macOS.
+#[tauri::command]
+fn release_focus(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let visible = |label| window(&app, label).is_visible().unwrap_or(false);
+        if !visible("quick") && !visible("settings") {
+            // The island window stays: it is marked `canHide = false` in `mac::raise_popup`.
+            let _ = app.hide();
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
 }
 
 // ---------- settings ----------
@@ -218,6 +252,8 @@ fn apply_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
 }
 
 fn show_settings(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.show();
     let _ = window(app, "quick").hide();
     let w = window(app, "settings");
     let _ = w.center();
@@ -237,12 +273,12 @@ fn open_settings(app: AppHandle) {
 /// Keeps the settings window exactly as tall as its content.
 #[tauri::command]
 fn settings_resize(app: AppHandle, height: f64) {
-    let _ = window(&app, "settings").set_size(LogicalSize::new(SETTINGS_WIDTH, height));
+    resize_panel(&app, "settings", LogicalSize::new(SETTINGS_WIDTH, height));
 }
 
 #[tauri::command]
 fn hide_settings(app: AppHandle) {
-    let _ = window(&app, "settings").hide();
+    hide_panel(&app, "settings");
 }
 
 // ---------- notes & reminders ----------
@@ -298,7 +334,8 @@ fn popup_take_pending(state: tauri::State<AppState>) -> Vec<Popup> {
     std::mem::take(&mut *state.pending.lock().unwrap())
 }
 
-/// Sizes the popup to its islands and pins it to the top centre.
+/// Sizes the popup to its islands and pins it to the top centre (on macOS over the menu bar,
+/// so the first island can grow out of the notch).
 ///
 /// The popup window is shown once at startup and never hidden: showing a window activates
 /// it, which would steal focus from the quick window mid-sentence. With no islands it is
@@ -311,10 +348,13 @@ fn popup_layout(app: AppHandle, height: f64) {
 fn place_popup(w: &WebviewWindow, height: f64) {
     let _ = w.set_size(LogicalSize::new(POPUP_WIDTH, height));
     if let Ok(Some(monitor)) = w.primary_monitor() {
-        let area = monitor.work_area();
+        #[cfg(target_os = "macos")]
+        let (origin, size) = (*monitor.position(), *monitor.size());
+        #[cfg(not(target_os = "macos"))]
+        let (origin, size) = (monitor.work_area().position, monitor.work_area().size);
         let width = (POPUP_WIDTH * monitor.scale_factor()) as i32;
-        let x = area.position.x + (area.size.width as i32 - width) / 2;
-        let _ = w.set_position(PhysicalPosition::new(x, area.position.y));
+        let x = origin.x + (size.width as i32 - width) / 2;
+        let _ = w.set_position(PhysicalPosition::new(x, origin.y));
     }
 }
 
@@ -326,13 +366,15 @@ pub struct Notch {
 }
 
 #[tauri::command]
-fn popup_notch() -> Option<Notch> {
-    None
+fn popup_notch(app: AppHandle) -> Option<Notch> {
+    #[cfg(target_os = "macos")]
+    return mac::notch(&app);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        None
+    }
 }
-
-/// Called after the user clicks an island.
-#[tauri::command]
-fn release_focus() {}
 
 /// A glass pane in CSS pixels relative to the window's client area.
 #[derive(Deserialize, Clone, Debug)]
@@ -413,11 +455,19 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&new_note, &settings, &separator, &quit])?;
 
-    TrayIconBuilder::with_id("main")
+    // macOS: a monochrome template icon tinted by the menu bar, and the menu on click as usual there.
+    #[cfg(target_os = "macos")]
+    let tray = TrayIconBuilder::with_id("main")
+        .icon(tauri::include_image!("icons/tray-template.png"))
+        .icon_as_template(true)
+        .show_menu_on_left_click(true);
+    #[cfg(not(target_os = "macos"))]
+    let tray = TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("Notifyer")
+        .show_menu_on_left_click(false);
+
+    tray.tooltip("Notifyer")
         .menu(&menu)
-        .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "new" => show_quick(app),
             "settings" => show_settings(app),
@@ -425,6 +475,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
+            if cfg!(target_os = "macos") {
+                return;
+            }
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
@@ -436,6 +489,28 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
+}
+
+/// macOS draws the glass and the shadow natively. The island window is never key, so it has
+/// to take the first click itself instead of spending it on activation.
+#[cfg(target_os = "macos")]
+fn mac_window_config(mut config: tauri::utils::config::WindowConfig) -> tauri::utils::config::WindowConfig {
+    use tauri::utils::config::WindowEffectsConfig;
+    use tauri::window::{Effect, EffectState};
+    if config.label == "popup" {
+        config.accept_first_mouse = true;
+        return config;
+    }
+    config.shadow = true;
+    config.window_effects = Some(WindowEffectsConfig {
+        // Liquid Glass on macOS 26+, the HUD material before it.
+        effects: vec![Effect::LiquidGlassRegular, Effect::HudWindow],
+        state: Some(EffectState::Active),
+        radius: Some(PANEL_RADIUS),
+        color: None,
+        interactive: false,
+    });
+    config
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -471,6 +546,10 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            // A menu bar app: no Dock icon (also `LSUIElement` in Info.plist).
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             let dir = app.path().app_config_dir()?;
             let config_path = dir.join("config.json");
             let config = config::load_or_create(&config_path);
@@ -494,10 +573,14 @@ pub fn run() {
             // Windows are created only now, once the state their commands rely on exists
             // (`"create": false` in tauri.conf.json); otherwise early invokes fail.
             for config in app.config().app.windows.clone() {
+                #[cfg(target_os = "macos")]
+                let config = mac_window_config(config);
                 tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?.build()?;
             }
 
             let popup = window(app.handle(), "popup");
+            #[cfg(target_os = "macos")]
+            mac::raise_popup(&popup);
             let _ = popup.set_ignore_cursor_events(true);
             place_popup(&popup, 1.0);
             let _ = popup.show();
@@ -507,7 +590,7 @@ pub fn run() {
             settings.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    let _ = settings_handle.hide();
+                    hide_panel(settings_handle.app_handle(), "settings");
                 }
             });
 

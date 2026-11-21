@@ -29,7 +29,7 @@
   --pop-duration: 220ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  font-family: "Inter Variable", "Segoe UI Variable Text", system-ui, sans-serif;
+  font-family: "Inter Variable", "Segoe UI Variable Text", -apple-system, system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.4;
   letter-spacing: -0.006em;
@@ -38,6 +38,21 @@
   -webkit-font-smoothing: antialiased;
   font-synthesis: none;
   font-feature-settings: "cv11", "ss03";
+}
+
+/* macOS draws the glass (window effects) and the shadow itself, and the window is exactly the
+   panel: no transparent margin, a lighter tint, and no CSS pop-in the native glass would not follow. */
+:root[data-platform="mac"] {
+  --shadow-room: 0px;
+  --glass-tint: rgba(22, 22, 28, 0.3);
+}
+
+:root[data-platform="mac"] .panel {
+  box-shadow: none;
+}
+
+:root[data-platform="mac"] .pop {
+  animation: none;
 }
 
 * {

@@ -63,10 +63,18 @@ struct ObsidianConfig {
     vaults: std::collections::HashMap<String, ObsidianVault>,
 }
 
+/// Where Obsidian keeps its list of vaults.
+fn obsidian_config_path() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    let base = PathBuf::from(std::env::var_os("HOME")?).join("Library").join("Application Support");
+    #[cfg(not(target_os = "macos"))]
+    let base = PathBuf::from(std::env::var_os("APPDATA")?);
+    Some(base.join("obsidian").join("obsidian.json"))
+}
+
 /// Picks the vault Obsidian has open, otherwise the most recently used one.
 pub fn detect_vault() -> Option<PathBuf> {
-    let appdata = std::env::var_os("APPDATA")?;
-    let raw = fs::read_to_string(Path::new(&appdata).join("obsidian").join("obsidian.json")).ok()?;
+    let raw = fs::read_to_string(obsidian_config_path()?).ok()?;
     let parsed: ObsidianConfig = serde_json::from_str(&raw).ok()?;
     parsed
         .vaults

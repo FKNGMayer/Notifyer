@@ -1,0 +1,6 @@
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- macOS menu bar template: only the alpha channel is used, the system picks the colour. -->
+  <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="white"/><circle cx="18.6" cy="5.4" r="4.7" fill="black"/><rect x="6.6" y="9.6" width="9" height="1.7" rx="0.85" fill="black"/><rect x="6.6" y="13.2" width="10.6" height="1.7" rx="0.85" fill="black"/><rect x="6.6" y="16.8" width="6" height="1.7" rx="0.85" fill="black"/></mask>
+  <rect x="2.6" y="3.4" width="18.2" height="18.2" rx="5.2" fill="#000" mask="url(#m)"/>
+  <circle cx="18.6" cy="5.4" r="3.1" fill="#000"/>
+</svg>
